@@ -18,12 +18,18 @@ import {
   RotateCcw,
   GraduationCap,
   MessageSquare,
-  Lightbulb
+  Lightbulb,
+  TrendingUp
 } from 'lucide-react';
 import { questionBank, getRandomQuestion, subjects, Question } from '@/data/questionBank';
 import { FlashCards } from '@/components/FlashCards';
 import { ChatMessage } from '@/components/ChatMessage';
 import { UserProgress } from '@/components/UserProgress';
+import { VoiceRecognition } from '@/components/VoiceRecognition';
+import { StudyAnalytics } from '@/components/StudyAnalytics';
+import { StudyTimer } from '@/components/StudyTimer';
+import { AchievementSystem } from '@/components/AchievementSystem';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface Message {
   id: string;
@@ -56,6 +62,8 @@ const NovaAI = () => {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
   const [showFlashCards, setShowFlashCards] = useState(false);
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [studySessionActive, setStudySessionActive] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -208,20 +216,44 @@ const NovaAI = () => {
     }
   };
 
+  const handleVoiceTranscription = (text: string) => {
+    setInputValue(text);
+  };
+
+  const handleStudySessionComplete = (timeSpent: number, mode: string) => {
+    const bonusPoints = Math.floor(timeSpent * 2); // 2 points per minute
+    setUserStats(prev => ({
+      ...prev,
+      totalPoints: prev.totalPoints + bonusPoints,
+      level: Math.floor((prev.totalPoints + bonusPoints) / 1000) + 1
+    }));
+
+    const congratsMessage: Message = {
+      id: Date.now().toString(),
+      text: `🎉 Study session complete! You studied for ${timeSpent} minutes and earned ${bonusPoints} bonus points!\n\nGreat job staying focused! Ready for some questions to test what you've learned?`,
+      isBot: true,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, congratsMessage]);
+  };
+
   return (
     <div className="min-h-screen animated-bg">
       <div className="container mx-auto p-4 max-w-7xl">
         {/* Header */}
         <Card className="mb-6 nova-soft-shadow border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-4">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="nova-gradient rounded-full p-3">
-                <Brain className="h-8 w-8 text-white" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="nova-gradient rounded-full p-3">
+                  <Brain className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+                  Nova AI
+                </CardTitle>
+                <Sparkles className="h-6 w-6 text-primary animate-pulse" />
               </div>
-              <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
-                Nova AI
-              </CardTitle>
-              <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+              <ThemeToggle />
             </div>
             <p className="text-muted-foreground text-lg">
               Your Intelligent Learning Companion - Master Every Subject with AI-Powered Education
@@ -233,6 +265,9 @@ const NovaAI = () => {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
             <UserProgress userStats={userStats} />
+            
+            {/* Study Timer */}
+            <StudyTimer onSessionComplete={handleStudySessionComplete} />
             
             {/* Grade & Subject Selection */}
             <Card className="nova-soft-shadow border-0 bg-white/80 backdrop-blur-sm">
@@ -295,7 +330,7 @@ const NovaAI = () => {
           {/* Main Chat Area */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="chat" className="h-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsList className="grid w-full grid-cols-4 mb-4">
                 <TabsTrigger value="chat" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
                   AI Chat
@@ -303,6 +338,14 @@ const NovaAI = () => {
                 <TabsTrigger value="flashcards" className="flex items-center gap-2">
                   <Lightbulb className="h-4 w-4" />
                   Flash Cards
+                </TabsTrigger>
+                <TabsTrigger value="analytics" className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Analytics
+                </TabsTrigger>
+                <TabsTrigger value="achievements" className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Achievements
                 </TabsTrigger>
               </TabsList>
 
@@ -329,21 +372,31 @@ const NovaAI = () => {
                         </div>
                       )}
                       
-                      <div className="flex gap-2">
-                        <Input
-                          value={inputValue}
-                          onChange={(e) => setInputValue(e.target.value)}
-                          onKeyPress={handleKeyPress}
-                          placeholder={isAnswering ? "Type your answer..." : "Ask me anything about school subjects..."}
-                          className="flex-1 nova-transition focus:ring-2 focus:ring-primary"
-                        />
-                        <Button 
-                          onClick={handleSendMessage}
-                          className="nova-gradient text-white nova-transition hover:scale-105"
-                          disabled={!inputValue.trim()}
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex justify-end">
+                          <VoiceRecognition 
+                            onTranscription={handleVoiceTranscription}
+                            isListening={isVoiceListening}
+                            setIsListening={setIsVoiceListening}
+                          />
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Input
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            placeholder={isAnswering ? "Type your answer or use voice..." : "Ask me anything about school subjects..."}
+                            className="flex-1 nova-transition focus:ring-2 focus:ring-primary"
+                          />
+                          <Button 
+                            onClick={handleSendMessage}
+                            className="nova-gradient text-white nova-transition hover:scale-105"
+                            disabled={!inputValue.trim()}
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -360,6 +413,25 @@ const NovaAI = () => {
                       totalPoints: prev.totalPoints + points,
                       level: Math.floor((prev.totalPoints + points) / 1000) + 1
                     }));
+                  }}
+                />
+              </TabsContent>
+
+              <TabsContent value="analytics">
+                <StudyAnalytics userStats={userStats} />
+              </TabsContent>
+
+              <TabsContent value="achievements">
+                <AchievementSystem 
+                  userStats={userStats}
+                  onAchievementUnlocked={(achievement) => {
+                    const achievementMessage: Message = {
+                      id: Date.now().toString(),
+                      text: `🏆 Achievement Unlocked: "${achievement.title}"!\n\n${achievement.description}\n\nYou earned ${achievement.points} bonus XP! Keep up the amazing work!`,
+                      isBot: true,
+                      timestamp: new Date()
+                    };
+                    setMessages(prev => [...prev, achievementMessage]);
                   }}
                 />
               </TabsContent>
